@@ -1,0 +1,9 @@
+<launch>
+<node pkg="rviz" type="rviz" name="rviz" args="-d ${find point_cloud_pkg}/rviz/point_cloud.rviz"></node>
+<node pkg="point_cloud_pkg" type="point_cloud_publisher" name="point_cloud_node" output="screen"></node>
+<node pkg="point_cloud_pkg" type="point_cloud_transform" name="point_cloud_transform" output="screen"></node>
+<!-- pkg功能包名：看package.xml中的名字；
+	   type可执行文件名：看cmakelists.txt里面add_executable对应名字
+	   name节点名：launch中的name会替代cpp中的ros::init()中的那么
+-->
+</launch>
