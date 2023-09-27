@@ -15,10 +15,14 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(PCL REQUIRED COMPONENTS common io)
 find_package(catkin REQUIRED COMPONENTS ${PACKAGE_DEPENDENCIES})
 
-catkin_package( )
+catkin_package(
+
+ )
 
 include_directories(
-  ${catkin_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS} 
+  ${PCL_INCLUDE_DIRS}
+  include
 )
 
 link_directories(${PCL_LIBRARY_DIRS})
@@ -37,6 +41,5 @@ add_executable(pcl_collision3d_node src/pcl_collision3d.cc)
 target_link_libraries(pcl_collision3d_node ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 
-add_executable(rviz_test src/rviz_test.cc)
-target_link_libraries(rviz_test ${catkin_LIBRARIES} )
+
 

@@ -17,7 +17,7 @@
 #include <random>
 #include <cmath>
 
-#include "../include/sdqp.hpp"
+#include "sdqp.hpp"
 #include "vis_ros1.hpp"
 
 using Vec2d = Eigen::Vector2d;
@@ -34,10 +34,6 @@ public:
         vis_ptr_->enroll<vis::vMarker>("robot_center");
         pcl_pub = nh_.advertise<sensor_msgs::PointCloud2>("pcl_output", 1);
 
-        robot_pub = nh_.advertise<visualization_msgs::Marker>(
-            "robot_center", 1, true);
-        arrow_pub = nh_.advertise<visualization_msgs::Marker>(
-            "collision_arrow", 1, true);
         ros::Subscriber robot_sub = nh_.subscribe("/move_base_simple/goal", 1, &collision_vec::robotCallBack, this);
         pointcloudGeneration(0, 3, 30);
 
@@ -60,8 +56,6 @@ public:
 private:
     ros::NodeHandle nh_;
     ros::Publisher pcl_pub;
-    ros::Publisher robot_pub;
-    ros::Publisher arrow_pub;
     Vec2d robot_center;
     std::shared_ptr<vis::displayRviz> vis_ptr_;
     pcl::PointCloud<pcl::PointXYZRGB> cloud; // random point cloud
