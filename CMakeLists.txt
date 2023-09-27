@@ -37,4 +37,6 @@ add_executable(pcl_collision3d_node src/pcl_collision3d.cc)
 target_link_libraries(pcl_collision3d_node ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 
+add_executable(rviz_test src/rviz_test.cc)
+target_link_libraries(rviz_test ${catkin_LIBRARIES} )
 

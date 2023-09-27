@@ -1,0 +1,7 @@
+<launch>
+    <node pkg="point_cloud_pkg" name="pcl_collision_node" type = "pcl_collision_node" output="screen">
+    </node>
+<node pkg="tf" type="static_transform_publisher" name="map_rtk_broadcaster" args="0 0 0 0 0 0 /map /rtk 100" />
+<node pkg="rviz" type="rviz" name="$(anon rviz)" args="-d ${find point_cloud_pkg}/rviz/point_cloud_noetic.rviz"></node>
+
+</launch>

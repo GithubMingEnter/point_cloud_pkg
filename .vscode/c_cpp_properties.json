@@ -1,0 +1,33 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/d/software/ws_plotjuggler/devel/include/**",
+        "/home/d/ros1_workspace/2wallFollow/catkin_ws/devel/include/**",
+        "/home/d/githubPro/VAP_ws/devel/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/d/githubPro/VAP_ws/src/VisibilityAwarePlanner/daimon_cmdvel_mux/include/**",
+        "/home/d/githubPro/VAP_ws/src/VisibilityAwarePlanner/daimon_controller/include/**",
+        "/home/d/githubPro/VAP_ws/src/VisibilityAwarePlanner/daimon_fusion_map/include/**",
+        "/home/d/githubPro/VAP_ws/src/VisibilityAwarePlanner/daimon_path_search/include/**",
+        "/home/d/githubPro/VAP_ws/src/VisibilityAwarePlanner/daimon_planner_manage/include/**",
+        "/home/d/githubPro/VAP_ws/src/VisibilityAwarePlanner/daimon_tool/include/**",
+        "/home/d/githubPro/VAP_ws/src/VisibilityAwarePlanner/daimon_traj_planner/include/**",
+        "/home/d/ros1_workspace/2wallFollow/catkin_ws/src/husky/husky_base/include/**",
+        "/home/d/ros1_workspace/test_ws/src/point_cloud_pkg/include/**",
+        "/home/d/ros1_workspace/test_ws/src/test_hybrid_Astar/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

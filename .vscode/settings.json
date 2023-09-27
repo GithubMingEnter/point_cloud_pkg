@@ -1,0 +1,8 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/d/ros1_workspace/2wallFollow/catkin_ws/devel/lib/python3/dist-packages",
+        "/home/d/software/ws_plotjuggler/devel/lib/python3/dist-packages",
+        "/home/d/githubPro/VAP_ws/devel/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages"
+    ]
+}
