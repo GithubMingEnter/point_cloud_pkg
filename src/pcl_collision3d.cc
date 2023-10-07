@@ -28,6 +28,7 @@ public:
         vis_ptr_.reset(new vis::displayRviz(nh_));
         vis_ptr_->enroll<vis::vMarker>("collision_arrow");
         vis_ptr_->enroll<vis::vMarker>("robot_center");
+        vis_ptr_->enroll<geometry_msgs::PolygonStamped>("diff_poly");
         pcl_pub = nh_.advertise<sensor_msgs::PointCloud2>("pcl_output", 1);
 
 
@@ -125,6 +126,29 @@ private:
             p2.z = x.z();
             vis_ptr_->vis_arrow(p1, p2, "collision_arrow", Vec3d(0.1, 0.1, 0.6),vis::vMarker::ADD,"map",vis::orange); //,vis::blue
 
+            Vec3d separate_point=Vec3d(x.x(),x.y(),x.z());
+            Vec3d normal_vector=Vec3d(robot_center(0),robot_center(1),robot_center.z())-separate_point;
+
+            double h=6,w=6;
+            Vec3ds pts(4);
+            pts[0].y()=p2.y-w;
+            pts[0].z()=p2.z;
+            pts[0].x()=placeVx(separate_point,normal_vector,pts[0].z(),pts[0].y());
+
+            pts[1].y()=p2.y+w;
+            pts[1].z()=p2.z;
+            pts[1].x()=placeVx(separate_point,normal_vector,pts[1].z(),pts[1].y());
+
+            pts[2].y()=p2.y+w;
+            pts[2].z()=p2.z+h;
+            pts[2].x()=placeVx(separate_point,normal_vector,pts[2].z(),pts[2].y());
+
+            pts[3].y()=p2.y-w;
+            pts[3].z()=p2.z+h;
+            pts[3].x()=placeVx(separate_point,normal_vector,pts[3].z(),pts[3].y());
+
+
+            vis_ptr_->vis_poly(pts,"diff_poly");
         }
         else
         {
@@ -134,6 +158,21 @@ private:
         }
 
     }
+    // 根据平面方程计算x的值
+    double placeVx(Vec3d sp,const Vec3d nv,double z,double y)
+    {
+        static int ind;
+        ++ind;
+        //a(x-x0)+b(y-y0)+c(z-z0)=0
+        double tx=nv.tail(2).transpose()*Vec2d(y-sp(1),z-sp(0));
+        double x=sp(0)-tx/nv(0);
+        std::cout<<"i = "<<ind<<" "
+                "x = "<<x<<" "
+                "y = "<<y<<" "
+                "z = "<<z<<std::endl;
+        return x;
+
+    }    
 };
 int main(int argc, char **argv)
 {

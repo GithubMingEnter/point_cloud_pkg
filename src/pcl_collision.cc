@@ -7,10 +7,11 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Point.h>
-#include <geometry_msgs/PoseStamped.h>
+
 #include <tf2_ros/transform_broadcaster.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <Eigen/Core>
+
 
 #include <iostream>
 #include <vector>
@@ -32,8 +33,9 @@ public:
         vis_ptr_.reset(new vis::displayRviz(nh_));
         vis_ptr_->enroll<vis::vMarker>("collision_arrow");
         vis_ptr_->enroll<vis::vMarker>("robot_center");
+        vis_ptr_->enroll<geometry_msgs::PolygonStamped>("diff_poly");
         pcl_pub = nh_.advertise<sensor_msgs::PointCloud2>("pcl_output", 1);
-
+        polys_pub_=nh_.advertise<geometry_msgs::PolygonStamped>("poly_output",3);
         ros::Subscriber robot_sub = nh_.subscribe("/move_base_simple/goal", 1, &collision_vec::robotCallBack, this);
         pointcloudGeneration(0, 3, 30);
 
@@ -55,7 +57,7 @@ public:
 
 private:
     ros::NodeHandle nh_;
-    ros::Publisher pcl_pub;
+    ros::Publisher pcl_pub,polys_pub_;
     Vec2d robot_center;
     std::shared_ptr<vis::displayRviz> vis_ptr_;
     pcl::PointCloud<pcl::PointXYZRGB> cloud; // random point cloud
@@ -125,20 +127,50 @@ private:
         robot_pt.y=robot_center(1);
         robot_pt.z=0.0;//robot_center(2);
         vis_ptr_->vis_single_marker(robot_pt,"robot_center",Vec3d(0.1,0.1,0.3),vis::vMarker::CUBE,"map",vis::pink);
+        
 
 
         // collision arrow
         if (cost != INFINITY)
         {
-            geometry_msgs::Point p1, p2;
+            geometry_msgs::Point p1, pe;
             p1.x = robot_center.x();
             p1.y = robot_center.y();
             p1.z = 0.0;
-            p2.x = x.x();
-            p2.y = x.y();
-            p2.z = 0.0;
-            vis_ptr_->vis_arrow(p1, p2, "collision_arrow", Vec3d(0.1, 0.1, 0.6),vis::vMarker::ADD,"map",vis::orange); //,vis::blue
+            pe.x = x.x();
+            pe.y = x.y();
+            pe.z = 0.0;
+            vis_ptr_->vis_arrow(p1, pe, "collision_arrow", Vec3d(0.1, 0.1, 0.6),vis::vMarker::ADD,"map",vis::orange); //,vis::blue
             
+            
+            Vec3d separate_point=Vec3d(x.x(),x.y(),0);//分割点
+            Vec3d normal_vector=Vec3d(robot_center(0),robot_center(1),0)-separate_point;
+            double h=6,w=6;
+            
+            Vec3ds pts(4);
+            pts[0].y()=pe.y-w;
+            pts[0].z()=pe.z;
+            pts[0].x()=placeVx(separate_point,normal_vector,pts[0].z(),pts[0].y());
+
+            pts[1].y()=pe.y+w;
+            pts[1].z()=pe.z;
+            pts[1].x()=placeVx(separate_point,normal_vector,pts[1].z(),pts[1].y());
+
+            pts[2].y()=pe.y+w;
+            pts[2].z()=pe.z+h;
+            pts[2].x()=placeVx(separate_point,normal_vector,pts[2].z(),pts[2].y());
+
+            pts[3].y()=pe.y-w;
+            pts[3].z()=pe.z+h;
+            pts[3].x()=placeVx(separate_point,normal_vector,pts[3].z(),pts[3].y());
+
+
+            vis_ptr_->vis_poly(pts,"diff_poly");
+
+
+
+
+
         }
         else
         {
@@ -146,6 +178,21 @@ private:
             vis_ptr_->vis_arrow(p1, p2, "collision_arrow", Vec3d(0.1, 0.1, 0.6),vis::vMarker::DELETE);
 
         }
+    }
+    // 根据平面方程计算x的值
+    double placeVx(Vec3d sp,const Vec3d nv,double z,double y)
+    {
+        static int ind;
+        ++ind;
+        //a(x-x0)+b(y-y0)+c(z-z0)=0
+        double tx=nv.tail(2).transpose()*Vec2d(y-sp(1),z-sp(0));
+        double x=sp(0)-tx/nv(0);
+        std::cout<<"i = "<<ind<<" "
+                "x = "<<x<<" "
+                "y = "<<y<<" "
+                "z = "<<z<<std::endl;
+        return x;
+
     }
 };
 

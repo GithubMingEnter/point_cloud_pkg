@@ -4,6 +4,8 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PolygonStamped.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
 
@@ -341,7 +343,8 @@ namespace vis
         }
         template <class _topic>
         void vis_single_marker(const geometry_msgs::Point pt, const _topic &topic,
-                               const Vec3d &scale_xyz, int32_t marker_type = vMarker::SPHERE, const std::string &frame = "map", const Color color = red)
+                               const Vec3d &scale_xyz, int32_t marker_type = vMarker::SPHERE,
+                                const std::string &frame = "map", const Color color = red)
         {
             auto pub_iter = vis_pub_map_.find(topic);
             if (pub_iter == vis_pub_map_.end())
@@ -360,6 +363,30 @@ namespace vis
             setMarkerScale(single_marker, scale_xyz);
             vis_pub_map_[topic].publish(single_marker);
         }
+        template<class _topic>
+        void vis_poly(Vec3ds pts,const _topic &topic, const std::string &frame = "map")
+        {
+            auto pub_iter = vis_pub_map_.find(topic);
+            if (pub_iter == vis_pub_map_.end())
+            {
+                
+                ros::Publisher vis_pub = nh_.advertise<geometry_msgs::PolygonStamped>(topic, 3);
+                vis_pub_map_[topic] = vis_pub;
+            }
+            geometry_msgs::PolygonStamped polys;
+            polys.header.frame_id=frame;
+            polys.header.stamp=ros::Time::now();
+            for(int i=0;i<pts.size();i++)
+            {
+                geometry_msgs::Point32 p;
+                p.x=pts[i](0);p.y=pts[i](1);p.z=pts[i](2);
+                polys.polygon.points.emplace_back(p);
+            }
+            vis_pub_map_[topic].publish(polys);
+
+        }
+
+
     };
 
 }
