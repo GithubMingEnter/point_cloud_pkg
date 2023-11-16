@@ -1,0 +1,7 @@
+<launch>
+    <node pkg="point_cloud_pkg" name="laser_safe_region" type = "laser_safe_region_node" output="screen">
+    </node>
+
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find jackal_viz)/rviz/point_cloud_noetic.rviz" />
+
+</launch>

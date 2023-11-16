@@ -10,10 +10,13 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   std_srvs
+  tf
+  message_filters
 )
 
 find_package(PCL REQUIRED COMPONENTS common io)
 find_package(catkin REQUIRED COMPONENTS ${PACKAGE_DEPENDENCIES})
+find_package(spdlog REQUIRED)
 
 catkin_package(
 
@@ -22,6 +25,7 @@ catkin_package(
 include_directories(
   ${catkin_INCLUDE_DIRS} 
   ${PCL_INCLUDE_DIRS}
+  ${spdlog_INCLUDE_DIRS}
   include
 )
 
@@ -39,6 +43,14 @@ target_link_libraries(pcl_collision_node ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(pcl_collision3d_node src/pcl_collision3d.cc)
 target_link_libraries(pcl_collision3d_node ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+add_executable(laser_safe_region_node src/laser_safe_region.cc)
+target_link_libraries(laser_safe_region_node
+${catkin_LIBRARIES} 
+${PCL_LIBRARIES}
+${spdlog_LIBRARIES}
+
+)
 
 
 

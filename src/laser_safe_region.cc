@@ -1,8 +1,12 @@
 
+
 #include <ros/ros.h>
 #include <pcl/point_cloud.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/LaserScan.h>
+#include <laser_geometry/laser_geometry.h>
+
 
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
@@ -10,7 +14,19 @@
 
 #include <tf2_ros/transform_broadcaster.h>
 #include <geometry_msgs/TransformStamped.h>
+#include <message_filters/subscriber.h>
+#include <tf2_ros/message_filter.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_eigen/tf2_eigen.h>
 #include <Eigen/Core>
+
+
+#include <pcl_ros/transforms.h>
+#include <pcl_ros/point_cloud.h>
+#include <pcl_conversions/pcl_conversions.h>
+
+
 
 
 #include <iostream>
@@ -21,9 +37,12 @@
 #include "sdqp.hpp"
 #include "vis_ros1.hpp"
 
+// spdlog
+#include <spdlog/spdlog.h>
+
 using Vec2d = Eigen::Vector2d;
 
-class collision_vec
+class LaserSafeRegion
 {
 
 public:
@@ -34,30 +53,35 @@ public:
         vis_ptr_->enroll<vis::vMarker>("collision_arrow");
         vis_ptr_->enroll<vis::vMarker>("robot_center");
         vis_ptr_->enroll<geometry_msgs::PolygonStamped>("diff_poly");
-        pcl_pub = nh_.advertise<sensor_msgs::PointCloud2>("pcl_output", 1);
+        pcl_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("pcl_output", 1);
         polys_pub_=nh_.advertise<geometry_msgs::PolygonStamped>("poly_output",3);
-        ros::Subscriber robot_sub = nh_.subscribe("/move_base_simple/goal", 1, &collision_vec::robotCallBack, this);
+        robot_sub_ = nh_.subscribe("/move_base_simple/goal", 1, &LaserSafeRegion::robotCallBack, this);
+        // laser_sub_ = nh_.subscribe(laser_topic_,10,&)
         pointcloudGeneration(0, 3, 30);
 
         pcl::toROSMsg(cloud, output_point_msg);
         output_point_msg.header.frame_id = "map";
-        ros::Rate loop_rate(11);
+       
 
+
+    }
+    void run()
+    {
+         ros::Rate loop_rate(11);
         while (ros::ok())
         {
             output_point_msg.header.stamp = ros::Time::now();
-            pcl_pub.publish(output_point_msg);
+            pcl_pub_.publish(output_point_msg);
             ros::spinOnce();
             loop_rate.sleep();
         }
     }
-    void run()
-    {
-    }
 
 private:
     ros::NodeHandle nh_;
-    ros::Publisher pcl_pub,polys_pub_;
+    std::string laser_topic_;
+    ros::Publisher pcl_pub_,polys_pub_;
+    ros::Subscriber laser_sub_,robot_sub_;
     Vec2d robot_center;
     std::shared_ptr<vis::displayRviz> vis_ptr_;
     pcl::PointCloud<pcl::PointXYZRGB> cloud; // random point cloud
@@ -84,7 +108,10 @@ private:
             std::cout << "x=" << cloud.points[i].x;
         }
     }
+    void laserCallBack(const sensor_msgs::LaserScan::ConstPtr& laser_msg)
+    {
 
+    }
     void robotCallBack(const geometry_msgs::PoseStamped::ConstPtr &msg)
     {
         ROS_INFO("robotCallback");
@@ -165,12 +192,7 @@ private:
             pts[3].z()=pe.z+h;
             pts[3].x()=placeVx(separate_point,normal_vector,pts[3].z(),pts[3].y());
 
-
             vis_ptr_->vis_poly(pts,"diff_poly");
-
-
-
-
 
         }
         else
@@ -199,11 +221,39 @@ private:
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "pcl_create");
+    ros::init(argc, argv, "laser_safe_region");
 
     ros::NodeHandle nh;
-    collision_vec cv;
+    LaserSafeRegion cv;
     cv.Init(nh);
-    // cv.run();
+    cv.run();
     return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
