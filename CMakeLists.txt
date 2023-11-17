@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(point_cloud_pkg)
-
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+set(CMAKE_CXX_STANDARD 14)  # 将 C++ 标准设置为 C++ 14
+set(CMAKE_CXX_STANDARD_REQUIRED ON)  # C++ 14 是强制要求，不会衰退至低版本
+set(CMAKE_CXX_EXTENSIONS OFF)  # 禁止使用编译器特有扩展
 find_package(catkin REQUIRED COMPONENTS
   message_generation
   pcl_conversions
@@ -12,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_srvs
   tf
   message_filters
+  laser_geometry
 )
 
 find_package(PCL REQUIRED COMPONENTS common io)
