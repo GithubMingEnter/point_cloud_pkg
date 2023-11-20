@@ -17,6 +17,7 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_eigen/tf2_eigen.h>
+#include<tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <Eigen/Core>
 
 #include <pcl_ros/transforms.h>
@@ -38,95 +39,50 @@
 using Vec2d = Eigen::Vector2d;
 using Mat4f = Eigen::Matrix4f;
 using Tfs = geometry_msgs::TransformStamped;
-     class GetPoseHelper
+
+class GetPoseHelper
 {
-public:
-  GetPoseHelper(tf2_ros::Buffer* tf,
-    const std::string& base_frame,
-    const std::string& odom_frame)
-  : tf_(tf), base_frame_(base_frame), odom_frame_(odom_frame)
-  {
-  };
-
-  bool getSelfPose(Eigen::Matrix4f& pose, const ros::Time& t)
-  {
-    geometry_msgs::TransformStamped base_ident, odom_pose;
-    base_ident.header.stamp = t;
-    base_ident.header.frame_id = base_frame_;
-    base_ident.transform.rotation.w = 1.0;
-
-    try
-    {
-      odom_pose = tf_->transform(base_ident, odom_frame_);
-    }
-    catch(tf2::TransformException e)
-    {
-      // ROS_WARN("Failed to compute odom pose, skipping scan (%s)", e.what());
-      return false;
-    }
-
-    // const double yaw = tf2::getYaw(odom_pose.transform.rotation);
-    // transfer geometry_msgs::TransformStamped to Eigen::Matrix4f
-    pose = Eigen::Matrix4f::Identity();
-    pose.block<3, 1>(0, 3) << odom_pose.transform.translation.x,
-      odom_pose.transform.translation.y,
-      odom_pose.transform.translation.z;
-    pose.block<3, 3>(0, 0) = Eigen::Quaternionf(odom_pose.transform.rotation.w,
-        odom_pose.transform.rotation.x,
-        odom_pose.transform.rotation.y,
-        odom_pose.transform.rotation.z)
-        .toRotationMatrix();
-
-    return true;
-  };
-
 private:
-  tf2_ros::Buffer* tf_;
-  std::string base_frame_, odom_frame_;
-};       
-// class GetPoseHelper
-// {
-// private:
-//     tf2_ros::Buffer *tf_;
-//     // reference frame , self frame;
-//     std::string ref_frame_, self_frame_;
+    tf2_ros::Buffer *tf_;
+    // reference frame , self frame;
+    std::string ref_frame_, self_frame_;
 
-// public:
-//     GetPoseHelper(tf2_ros::Buffer *tf,
-//                   const std::string &ref_frame,
-//                   const std::string &self_frame)
-//         : tf_(tf), ref_frame_(ref_frame), self_frame_(self_frame)
-//     {
-//     }
-//     bool getSelfPose(Mat4f &pose, const ros::Time &t)
-//     {
-//         Tfs ref_tfs, self_tfs;
-//         ref_tfs.header.stamp = t;
-//         ref_tfs.header.frame_id = ref_frame_;
-//         ref_tfs.transform.rotation.w = 1.0;
-//         try
-//         {
-//             self_tfs = tf_->transform(ref_tfs, self_frame_);
-//         }
-//         catch (tf2::TransformException e)
-//         {
+public:
+    GetPoseHelper(tf2_ros::Buffer *tf,
+                  const std::string &ref_frame,
+                  const std::string &self_frame)
+        : tf_(tf), ref_frame_(ref_frame), self_frame_(self_frame)
+    {
+    }
+    bool getSelfPose(Mat4f &pose, const ros::Time &t)
+    {
+        Tfs to_tfs, self_tfs;
+        self_tfs.header.stamp = t;
+        self_tfs.header.frame_id = self_frame_;
+        self_tfs.transform.rotation.w = 1.0;
+        try
+        {
+            to_tfs = tf_->transform(self_tfs ,ref_frame_);// tfs frame_id
+        }
+        catch (tf2::TransformException e)
+        {
             
-//             ROS_WARN("Failed to compute odom pose, skipping scan (%s)", e.what());
-//             return false;
-//         }
+            ROS_WARN("Failed to compute odom pose, skipping scan (%s)", e.what());
+            return false;
+        }
 
-//         // pose = Mat4f::Identity();
-//         // pose.block<3, 1>(0, 3) << self_tfs.transform.translation.x,
-//         //     self_tfs.transform.translation.y,
-//         //     self_tfs.transform.translation.z;
+        pose = Mat4f::Identity();
+        pose.block<3, 1>(0, 3) << to_tfs.transform.translation.x,
+            to_tfs.transform.translation.y,
+            to_tfs.transform.translation.z;
 
-//         // pose.block<3, 3>(0, 0) = Eigen::Quaternionf(self_tfs.transform.rotation.w,
-//         //                                             self_tfs.transform.rotation.x,
-//         //                                             self_tfs.transform.rotation.y,
-//         //                                             self_tfs.transform.rotation.z).toRotationMatrix();
-//         return true;
-//     }
-// };
+        pose.block<3, 3>(0, 0) = Eigen::Quaternionf(to_tfs.transform.rotation.w,
+                                                    to_tfs.transform.rotation.x,
+                                                    to_tfs.transform.rotation.y,
+                                                    to_tfs.transform.rotation.z).toRotationMatrix();
+        return true;
+    }
+};
 
 class LaserSafeRegion
 {
@@ -158,6 +114,8 @@ private:
     Vec2d robot_center;
     std::shared_ptr<vis::displayRviz> vis_ptr_;
     pcl::PointCloud<pcl::PointXYZRGB> cloud; // random point cloud
+    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> latest_laser_cloud_;
+
     sensor_msgs::PointCloud2 output_point_msg;
     std::vector<Vec2d> cloud_lists;
     std::unique_ptr<GetPoseHelper> pose_helper_;

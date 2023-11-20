@@ -17,8 +17,12 @@ void LaserSafeRegion::Init(ros::NodeHandle &nh)
     laser_pc_pub_=nh_.advertise<sensor_msgs::PointCloud2>("laser_pc",10);
     robot_sub_ = nh_.subscribe("/move_base_simple/goal", 1, &LaserSafeRegion::robotCallBack, this);
     // laser_sub_ = nh_.subscribe(laser_topic_,10,&)
+    std::cout<<"sensor/scan_topic "<<laser_topic_<<std::endl;
+
+
     TF_base_to_laser_ptr_.reset(new Tfs);
     tf2_ros::Buffer laser_tf2Buffer;
+    tf2_ros::TransformListener tfListener_scan(laser_tf2Buffer);
     //获取机器人base_link到激光雷达坐标变换
     try
     {
@@ -35,11 +39,12 @@ void LaserSafeRegion::Init(ros::NodeHandle &nh)
     base_to_laser_mat_ = tf2::transformToEigen(*(TF_base_to_laser_ptr_)).matrix().cast<float>();
     tf_ = std::make_unique<tf2_ros::Buffer>(ros::Duration(3.0));
     tfL_ = std::make_unique<tf2_ros::TransformListener>(*tf_);
+    latest_laser_cloud_.reset(new pcl::PointCloud<pcl::PointXYZ>);
     laser_filter_sub_ = std::make_unique<message_filters::Subscriber<sensor_msgs::LaserScan>>(nh_,laser_topic_,10);
     laser_filter_=std::make_unique<tf2_ros::MessageFilter<sensor_msgs::LaserScan>>(*laser_filter_sub_,*tf_,odom_frame_,10,nh_);
     laser_filter_->registerCallback(boost::bind(&LaserSafeRegion::laserCallBack,this,_1));
     pose_helper_ = std::make_unique<GetPoseHelper>(tf_.get(),odom_frame_,base_link_frame_);
-
+    std::cout<<"scan_sensor_frame_id "<<laser_frame_<<std::endl;
 }
 void LaserSafeRegion::run()
 {
@@ -77,27 +82,19 @@ void LaserSafeRegion::laserCallBack(const sensor_msgs::LaserScan::ConstPtr &lase
     Mat4f odom_to_base_mat;
     laser_nearest_time_=laser_msg->header.stamp;
     spdlog::info("enter laser callback");
+    latest_laser_cloud_.reset(new pcl::PointCloud<pcl::PointXYZ>);
     if(laser_msg->ranges.size()==0)
     {
-        spdlog::info("no msg");
+        spdlog::info("no laser msg");
         return ;
     }
-    // if(!pose_helper_->getSelfPose(odom_to_base_mat,laser_msg->header.stamp))
-    // {
-    //     spdlog::info("no tf odom_to_base_mat");
-    //     return ;
-    // }
-    tf2_ros::Buffer tf_odom_base_buf;
-    Tfs odom_tfs;
-    try
+    if(!pose_helper_->getSelfPose(odom_to_base_mat,laser_msg->header.stamp))
     {
-      odom_tfs=tf_odom_base_buf.lookupTransform(odom_frame_,base_link_frame_,ros::Time::now(), ros::Duration(3.0));
+        spdlog::info("no tf odom_to_base_mat");
+        return ;
     }
-    catch(tf2::TransformException e)
-    {
-      ROS_WARN("Failed to compute odom pose, skipping scan (%s)", e.what());
-    }
-    getMatPose(odom_to_base_mat,odom_tfs);
+
+    // std::cout<<"odom_to_base_mat = \n"<<odom_to_base_mat<<std::endl;
     sensor_msgs::LaserScan laser_scan = *laser_msg;
     for (unsigned int j = 0; j < laser_scan.ranges.size(); j++)
     {
@@ -106,18 +103,24 @@ void LaserSafeRegion::laserCallBack(const sensor_msgs::LaserScan::ConstPtr &lase
             laser_scan.ranges[j] = laser_scan.range_max;
         }
     }
+    
     // convert laser scan to point cloud
-    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> latest_laser_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     sensor_msgs::PointCloud2 laser_cloud;
     // projector_.projectLaser(laser_scan,laser_cloud);
-    
-    // pcl::fromROSMsg(laser_cloud,*latest_laser_cloud);
-    laserScanToPC(laser_msg,*latest_laser_cloud);
+    /* */
+    laserScanToPC(laser_msg,*latest_laser_cloud_);
+/*     pcl::toROSMsg(*latest_laser_cloud_,laser_cloud);
+    laser_cloud.header.frame_id="map";
+    laser_cloud.header.stamp=ros::Time::now(); */
+    /*  */
+    // pcl::fromROSMsg(laser_cloud,*latest_laser_cloud_);
+    //  其实不用写后面，直接参考激光雷达坐标系转换即可laser_pc_pub_.publish(laser_pc);
     const Mat4f odom_to_laser_mat = odom_to_base_mat*base_to_laser_mat_;
-    pcl::transformPointCloud(*latest_laser_cloud,*latest_laser_cloud,odom_to_laser_mat);
+    // std::cout<<"odom_to_laser_mat = \n "<<odom_to_laser_mat<<std::endl;
+    pcl::transformPointCloud(*latest_laser_cloud_,*latest_laser_cloud_,odom_to_laser_mat);
     sensor_msgs::PointCloud2 laser_pc;
-
-    pcl::toROSMsg(*latest_laser_cloud,laser_pc);
+    
+    pcl::toROSMsg(*latest_laser_cloud_,laser_pc);
     laser_pc.header.frame_id = "map";
     laser_pc.header.stamp=ros::Time::now();
 
@@ -131,7 +134,7 @@ void LaserSafeRegion::robotCallBack(const geometry_msgs::PoseStamped::ConstPtr &
 {
     ROS_INFO("robotCallback");
     robot_center = Vec2d(msg->pose.position.x, msg->pose.position.y);
-    if (cloud_lists.empty())
+    if (latest_laser_cloud_->points.empty())
     {
         ROS_WARN("NO POINT CLOUD");
         return;
@@ -142,15 +145,18 @@ void LaserSafeRegion::robotCallBack(const geometry_msgs::PoseStamped::ConstPtr &
     Eigen::Matrix2d Q = Eigen::Matrix2d::Identity();
     Vec2d c = Vec2d::Zero();
     Eigen::MatrixXd A; // TODO
-    A.resize(cloud_lists.size(), 2);
+    int scale_pro=latest_laser_cloud_->size();
+    A.resize(scale_pro, 2);
     for (int i = 0; i < A.rows(); i++)
     {
-        A.row(i) = (robot_center - cloud_lists[i]).transpose();
+        Vec2d pc_pos=Vec2d(latest_laser_cloud_->points[i].x,latest_laser_cloud_->points[i].y);
+        A.row(i) = (robot_center - pc_pos).transpose();//对每个点云构建向量
     }
-    Eigen::VectorXd b = -1.0 * Eigen::VectorXd::Ones(cloud_lists.size());
+    ROS_INFO_STREAM("___------solve problem--------____");
+    Eigen::VectorXd b = -1.0 * Eigen::VectorXd::Ones(scale_pro);
     double cost = sdqp::sdqp<2>(Q, c, A, b, z);
     Vec2d x;
-    ROS_INFO_STREAM("___--------------____");
+    ROS_INFO_STREAM("___------solve finish--------____");
     if (cost != INFINITY)
     {
         x = z / z.squaredNorm() + robot_center;
@@ -168,7 +174,8 @@ void LaserSafeRegion::robotCallBack(const geometry_msgs::PoseStamped::ConstPtr &
     robot_pt.x = robot_center(0);
     robot_pt.y = robot_center(1);
     robot_pt.z = 0.0; // robot_center(2);
-    vis_ptr_->vis_single_marker(robot_pt, "robot_center", Vec3d(0.1, 0.1, 0.3), vis::vMarker::CUBE, "map", vis::pink);
+    vis_ptr_->vis_single_marker(robot_pt, "robot_center", Vec3d(0.1, 0.1, 0.3),
+                                 vis::vMarker::CUBE, "map", vis::pink);
 
     // collision arrow
     if (cost != INFINITY)
@@ -212,11 +219,13 @@ void LaserSafeRegion::robotCallBack(const geometry_msgs::PoseStamped::ConstPtr &
         vis_ptr_->vis_arrow(p1, p2, "collision_arrow", Vec3d(0.1, 0.1, 0.6), vis::vMarker::DELETE);
     }
 }
-void LaserSafeRegion::laserScanToPC(sensor_msgs::LaserScan::ConstPtr laser_scan,pcl::PointCloud<pcl::PointXYZ>& pc)
+void LaserSafeRegion::laserScanToPC(sensor_msgs::LaserScan::ConstPtr laser_scan,
+                                    pcl::PointCloud<pcl::PointXYZ>& pc)
 {
     pc.clear();
     pcl::PointXYZ  new_pt;
     new_pt.z=0.0;
+    
     double new_pointAngle;
     int laser_num=laser_scan->ranges.size();
     for(int i=0 ; i<laser_num;i++){
@@ -249,11 +258,14 @@ bool LaserSafeRegion::getMatPose(Mat4f& pose,const Tfs& tfs_pose)
         pose.block<3, 1>(0, 3) << tfs_pose.transform.translation.x,
             tfs_pose.transform.translation.y,
             tfs_pose.transform.translation.z;
-
+        std::cout<< tfs_pose.transform.rotation.x<<
+                    tfs_pose.transform.rotation.y<<
+                    tfs_pose.transform.rotation.z<<std::endl;
         pose.block<3, 3>(0, 0) = Eigen::Quaternionf(tfs_pose.transform.rotation.w,
                                                     tfs_pose.transform.rotation.x,
                                                     tfs_pose.transform.rotation.y,
                                                     tfs_pose.transform.rotation.z).toRotationMatrix();
+        // pose.block<3,3>(0,0)=Eigen::Matrix3f::Identity();
         return true;
 }
 int main(int argc, char **argv)
