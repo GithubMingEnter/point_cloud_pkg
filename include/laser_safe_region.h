@@ -22,7 +22,8 @@
 
 #include <pcl_ros/transforms.h>
 #include <pcl_ros/point_cloud.h>
-#include <pcl_conversions/pcl_conversions.h>
+#include<pcl/filters/radius_outlier_removal.h>
+#include<pcl/filters/conditional_removal.h>
 
 #include <iostream>
 #include <vector>
@@ -40,6 +41,50 @@ using Vec2d = Eigen::Vector2d;
 using Mat4f = Eigen::Matrix4f;
 using Tfs = geometry_msgs::TransformStamped;
 
+using PointT=pcl::PointXYZ;
+using PclT=pcl::PointCloud<PointT>;
+
+using Vec2i = Eigen::Vector2i;
+using Vec3i = Eigen::Vector3i;
+using Vec3b = Eigen::Matrix<char, 3, 1>;
+
+using Vec2d = Eigen::Vector2d;
+using Vec2f = Eigen::Vector2f;
+using Vec3d = Eigen::Vector3d;
+using Vec3f = Eigen::Vector3f;
+using Vec4d = Eigen::Vector4d;
+using Vec4f = Eigen::Vector4f;
+using Vec5d = Eigen::Matrix<double, 5, 1>;
+using Vec5f = Eigen::Matrix<float, 5, 1>;
+using Vec6d = Eigen::Matrix<double, 6, 1>;
+using Vec6f = Eigen::Matrix<float, 6, 1>;
+using Vec9d = Eigen::Matrix<double, 9, 1>;
+using Vec15d = Eigen::Matrix<double, 15, 15>;
+using Vec18d = Eigen::Matrix<double, 18, 1>;
+
+using Mat1d = Eigen::Matrix<double, 1, 1>;
+using Mat2d = Eigen::Matrix<double, 2, 2>;
+using Mat23d = Eigen::Matrix<double, 2, 3>;
+using Mat32d = Eigen::Matrix<double, 3, 2>;
+using Mat3d = Eigen::Matrix3d;
+using Mat3f = Eigen::Matrix3f;
+using Mat4d = Eigen::Matrix4d;
+using Mat4f = Eigen::Matrix4f;
+using Mat5d = Eigen::Matrix<double, 5, 5>;
+using Mat5f = Eigen::Matrix<float, 5, 5>;
+using Mat6d = Eigen::Matrix<double, 6, 6>;
+using Mat6f = Eigen::Matrix<float, 6, 6>;
+using Mat9d = Eigen::Matrix<double, 9, 9>;
+using Mat96d = Eigen::Matrix<double, 9, 6>;
+using Mat15d = Eigen::Matrix<double, 15, 15>;
+using Mat18d = Eigen::Matrix<double, 18, 18>;
+
+using VecXd = Eigen::Matrix<double, -1, 1>;
+using MatXd = Eigen::Matrix<double, -1, -1>;
+using MatX18d = Eigen::Matrix<double, -1, 18>;
+
+using Quatd = Eigen::Quaterniond;
+using Quatf = Eigen::Quaternionf;
 class GetPoseHelper
 {
 private:
@@ -114,7 +159,9 @@ private:
     Vec2d robot_center;
     std::shared_ptr<vis::displayRviz> vis_ptr_;
     pcl::PointCloud<pcl::PointXYZRGB> cloud; // random point cloud
-    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> latest_laser_cloud_;
+
+    PclT::Ptr latest_laser_cloud_;
+    PclT::Ptr cloud_prepro_;
 
     sensor_msgs::PointCloud2 output_point_msg;
     std::vector<Vec2d> cloud_lists;
@@ -129,7 +176,7 @@ private:
     void robotCallBack(const geometry_msgs::PoseStamped::ConstPtr &msg);
     void laserScanToPC(sensor_msgs::LaserScan::ConstPtr laser_scan,pcl::PointCloud<pcl::PointXYZ>& pc);
     bool getMatPose(Mat4f& pose,const Tfs& tfs_pose);
-    
+    void preprocPointCloud(PclT::Ptr &point_cloud);
     // 根据平面方程计算x的值
     double placeVx(Vec3d sp, const Vec3d nv, double z, double y);
 };

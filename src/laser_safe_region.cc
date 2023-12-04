@@ -46,6 +46,7 @@ void LaserSafeRegion::Init(ros::NodeHandle &nh)
     pose_helper_ = std::make_unique<GetPoseHelper>(tf_.get(),odom_frame_,base_link_frame_);
     std::cout<<"scan_sensor_frame_id "<<laser_frame_<<std::endl;
 }
+
 void LaserSafeRegion::run()
 {
     ros::Rate loop_rate(11);
@@ -109,11 +110,12 @@ void LaserSafeRegion::laserCallBack(const sensor_msgs::LaserScan::ConstPtr &lase
     // projector_.projectLaser(laser_scan,laser_cloud);
     /* */
     laserScanToPC(laser_msg,*latest_laser_cloud_);
-/*     pcl::toROSMsg(*latest_laser_cloud_,laser_cloud);
+    /*     pcl::toROSMsg(*latest_laser_cloud_,laser_cloud);
     laser_cloud.header.frame_id="map";
     laser_cloud.header.stamp=ros::Time::now(); */
     /*  */
     // pcl::fromROSMsg(laser_cloud,*latest_laser_cloud_);
+    preprocPointCloud(latest_laser_cloud_);
     //  其实不用写后面，直接参考激光雷达坐标系转换即可laser_pc_pub_.publish(laser_pc);
     const Mat4f odom_to_laser_mat = odom_to_base_mat*base_to_laser_mat_;
     // std::cout<<"odom_to_laser_mat = \n "<<odom_to_laser_mat<<std::endl;
@@ -128,8 +130,29 @@ void LaserSafeRegion::laserCallBack(const sensor_msgs::LaserScan::ConstPtr &lase
     laser_pc_pub_.publish(laser_pc);
     // projector_()
 
+}
+void LaserSafeRegion::preprocPointCloud(PclT::Ptr &point_cloud)
+{
+    pcl::ConditionAnd<PointT>::Ptr range_and(new pcl::ConditionAnd<PointT>());
+    range_and->addComparison(pcl::FieldComparison<PointT>::ConstPtr (new
+                pcl::FieldComparison<PointT>("y",pcl::ComparisonOps::GT,-2.0)));
+    range_and->addComparison(pcl::FieldComparison<PointT>::ConstPtr (new
+                pcl::FieldComparison<PointT>("y",pcl::ComparisonOps::LT,2.0)));     
+     // 设置X轴的限制范围 [-2.0, 2.0]                
+    range_and->addComparison(pcl::FieldComparison<PointT>::ConstPtr (new
+                pcl::FieldComparison<PointT>("x",pcl::ComparisonOps::GT,-2.0)));
+    range_and->addComparison(pcl::FieldComparison<PointT>::ConstPtr (new
+                pcl::FieldComparison<PointT>("x",pcl::ComparisonOps::LT,2.0)));       
+    pcl::ConditionalRemoval<PointT> condrem;
+    condrem.setCondition(range_and);
+    condrem.setInputCloud(point_cloud);     
+    cloud_prepro_.reset(new PclT());
+    // condrem.filter(*cloud_prepro_);
+    condrem.filter(*point_cloud);
+       
 
 }
+
 void LaserSafeRegion::robotCallBack(const geometry_msgs::PoseStamped::ConstPtr &msg)
 {
     ROS_INFO("robotCallback");
